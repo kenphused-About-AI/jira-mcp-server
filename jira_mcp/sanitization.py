@@ -13,6 +13,6 @@ def sanitize_jql(jql: str) -> str:
 
     forbidden = ["`", "\x00", "|", "&"]
     if any(c in jql for c in forbidden):
-        raise ValueError("Invalid character in JQL")
+        raise ValueError("Invalid character in JQL.")
 
     return jql.strip()

@@ -35,6 +35,16 @@ class TestSanitizeJQL:
         with pytest.raises(ValueError, match="Invalid character in JQL"):
             sanitize_jql("project = TEST`")
 
+    def test_invalid_pipe_character(self):
+        """Pipe characters should raise ValueError."""
+        with pytest.raises(ValueError, match=r"Invalid character in JQL\."):
+            sanitize_jql("project = TEST | status = Open")
+
+    def test_invalid_ampersand_character(self):
+        """Ampersands should raise ValueError."""
+        with pytest.raises(ValueError, match=r"Invalid character in JQL\."):
+            sanitize_jql("project = TEST & status = Open")
+
     def test_invalid_empty_string(self):
         """Empty string should raise ValueError."""
         with pytest.raises(ValueError, match="JQL must be non-empty"):
