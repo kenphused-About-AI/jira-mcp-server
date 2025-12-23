@@ -50,8 +50,10 @@
 5. **Testing Strategy**
    - Unit tests for new sanitization helpers (`tests/test_sanitization.py`).
    - Tool handler tests using `pytest` and `unittest.mock` to assert calls to `jira_request` with expected endpoints/methods/params and to validate error handling on bad inputs.
+   - Integration tests for all tools to verify end-to-end functionality with mocked Jira responses.
    - Smoke test for `list_tools` to ensure all schemas are exposed.
 
 6. **Follow-up Housekeeping**
-   - Consider adding lightweight data classes or typed dicts for request bodies to improve mypy coverage.
+   - Add typed dicts for request bodies to improve mypy coverage and reduce boilerplate.
+   - Add error handling examples in documentation with sample Jira error responses.
    - Ensure `uv run ruff check .`, `uv run mypy jira_mcp`, and `uv run pytest` remain green after changes.

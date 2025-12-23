@@ -18,3 +18,6 @@
 - async/await for I/O operations
 - Environment variables for configuration
 - HTTPS-only for external calls
+
+## Agent Working Document Location
+All development markdown files are stored in the `docs/agents` directory. Future agent working documents will be created and maintained in this location.
