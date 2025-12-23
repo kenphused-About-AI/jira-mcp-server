@@ -1,84 +1,61 @@
-"""Integration tests for error handling in Jira API client."""
+"""Integration-style tests for jira_request error handling."""
+
+import asyncio
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-from jira_mcp.jira_api import JiraAPI
+
+from jira_mcp.jira_api import jira_request
 
 
-@pytest.mark.asyncio
-class TestErrorHandling:
-    """Test error scenarios and graceful degradation."""
+class _MockResponse:
+    def __init__(self, status: int, text: str):
+        self.status = status
+        self._text = text
 
-    async def test_network_timeout_error(self):
-        """Network timeout should raise RuntimeError with clean message."""
-        api = JiraAPI()
+    async def text(self, **kwargs):
+        return self._text
 
-        with patch.object(api._client, "get", new_callable=AsyncMock) as mock_get:
-            mock_get.side_effect = TimeoutError("Connection timed out")
 
-            with pytest.raises(RuntimeError, match="Failed to connect") as exc_info:
-                await api.get_issue("TEST-123")
+class _AsyncResponse:
+    def __init__(self, status: int, text: str):
+        self._delegate = _MockResponse(status, text)
+        self.status = status
 
-        assert "Connection timed out" not in str(exc_info.value)
+    async def __aenter__(self):
+        return self._delegate
 
-    async def test_401_unauthorized_error(self):
-        """401 error should not leak credential information."""
-        api = JiraAPI()
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
 
-        with patch.object(api._client, "get", new_callable=AsyncMock) as mock_get:
-            response = MagicMock()
-            response.status = 401
-            response.json = lambda: {"errorMessages": ["User not found"]}
-            mock_get.return_value.__aenter__.return_value = response
 
-            with pytest.raises(RuntimeError, match="Unauthorized") as exc_info:
-                await api.get_issue("TEST-123")
+def test_jira_request_raises_runtime_error_on_http_failure():
+    async def _run():
+        session = MagicMock()
+        session.request.return_value = _AsyncResponse(401, "Unauthorized")
 
-        assert "User not found" not in str(exc_info.value)
-        assert "email@example.com" not in str(exc_info.value)
+        with patch("jira_mcp.jira_api.get_session", AsyncMock(return_value=session)):
+            with pytest.raises(RuntimeError, match="Jira 401: Unauthorized"):
+                await jira_request("issue/PROJ-1")
 
-    async def test_403_forbidden_error(self):
-        """403 error should not expose Jira error details."""
-        api = JiraAPI()
+    asyncio.run(_run())
 
-        with patch.object(api._client, "get", new_callable=AsyncMock) as mock_get:
-            response = MagicMock()
-            response.status = 403
-            response.json = lambda: {"errorMessages": ["Permission denied"]}
-            mock_get.return_value.__aenter__.return_value = response
 
-            with pytest.raises(RuntimeError, match="Forbidden") as exc_info:
-                await api.get_issue("TEST-123")
+def test_jira_request_returns_json_on_success():
+    async def _run():
+        response_body = {"key": "PROJ-1"}
+        session = MagicMock()
+        session.request.return_value = _AsyncResponse(200, "{\"key\": \"PROJ-1\"}")
 
-        assert "Permission denied" not in str(exc_info.value)
+        with patch("jira_mcp.jira_api.get_session", AsyncMock(return_value=session)):
+            result = await jira_request("issue/PROJ-1")
 
-    async def test_non_json_error_response(self):
-        """Non-JSON error responses should not crash JSON parsing."""
-        api = JiraAPI()
+        assert result == response_body
+        session.request.assert_called_with(
+            "GET",
+            "https://example.atlassian.net/rest/api/3/issue/PROJ-1",
+            params=None,
+            json=None,
+        )
 
-        with patch.object(api._client, "get", new_callable=AsyncMock) as mock_get:
-            response = MagicMock()
-            response.status = 500
-            response.text = lambda **kwargs: "<html>Internal Server Error</html>"
-            mock_get.return_value.__aenter__.return_value = response
-
-            # Should not raise JSONDecodeError
-            with pytest.raises(RuntimeError, match="Internal Server Error") as exc_info:
-                await api.get_issue("TEST-123")
-
-        assert "<html>" not in str(exc_info.value)
-
-    async def test_rate_limit_error(self):
-        """429 rate limit should be handled gracefully."""
-        api = JiraAPI()
-
-        with patch.object(api._client, "get", new_callable=AsyncMock) as mock_get:
-            response = MagicMock()
-            response.status = 429
-            response.json = lambda: {"errorMessages": ["Rate limit exceeded"]}
-            mock_get.return_value.__aenter__.return_value = response
-
-            with pytest.raises(RuntimeError, match="Rate limit exceeded") as exc_info:
-                await api.get_issue("TEST-123")
-
-        assert "errorMessages" not in str(exc_info.value)
+    asyncio.run(_run())

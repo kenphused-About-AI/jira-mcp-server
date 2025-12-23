@@ -131,6 +131,19 @@ https://<host>:<port>
 - add_jira_comment – Add a comment to an issue
 - transition_jira_issue – Transition an issue to a new status
 
+### Tool Parameters and Defaults
+
+- **search_jira** – `{ jql: string, maxResults: 50, startAt: 0, fields: summary,status,assignee,priority,created,updated }`
+- **list_jira_issues** – `{ project: string, maxResults: 50, startAt: 0, fields: summary,status,assignee,priority,created,updated }`
+- **get_jira_issue** – `{ issueKey: string, fields: summary,status,assignee,priority,created,updated }`
+- **get_jira_comments** – `{ issueKey: string, maxResults: 50, startAt: 0 }`
+- **get_jira_transitions** – `{ issueKey: string }`
+- **get_jira_projects** – `{ maxResults: 50, startAt: 0 }`
+- **create_jira_issue** – `{ project: string, summary: string, description: "", issueType: "Task" }`
+- **update_jira_issue** – `{ issueKey: string, fields: object }`
+- **add_jira_comment** – `{ issueKey: string, body: string }`
+- **transition_jira_issue** – `{ issueKey: string, transitionId: string }`
+
 ---
 
 ## Example JQL Queries

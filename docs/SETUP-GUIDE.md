@@ -180,6 +180,19 @@ Conceptually, you want to confirm:
 
 Once this works, you are ready to integrate with clients.
 
+#### Tool Reference
+
+- `search_jira` – `jql` (required), optional `maxResults` (default 50) and `startAt` (default 0). JQL is sanitized to reject control characters and pipes.
+- `list_jira_issues` – `project` (required), optional `maxResults` (default 50), `startAt` (default 0), and `fields` (defaults to standard fields). Project keys are normalized to uppercase and must be alphanumeric/underscores.
+- `get_jira_issue` – `issueKey` (required) and optional `fields` (defaults to standard fields). Issue keys are normalized to uppercase and must match the `PROJ-123` pattern.
+- `get_jira_comments` – `issueKey` (required) plus optional pagination (`maxResults` default 50, `startAt` default 0).
+- `get_jira_transitions` – `issueKey` (required) for listing available transitions on an issue.
+- `get_jira_projects` – optional `maxResults` (default 50) and `startAt` (default 0) for paginated project discovery.
+- `create_jira_issue` – `project` and `summary` (required), optional `description` (default empty string) and `issueType` (default `Task`). Summary and type must be non-empty strings.
+- `update_jira_issue` – `issueKey` and `fields` object (both required) for updating existing issues.
+- `add_jira_comment` – `issueKey` and `body` (both required). Comment bodies are trimmed, must be non-empty, and reject null bytes, pipes, ampersands, and backticks.
+- `transition_jira_issue` – `issueKey` and numeric `transitionId` (both required) for status changes.
+
 ---
 
 ## 3. Configuring the MCP Server in goose

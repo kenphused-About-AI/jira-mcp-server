@@ -5,10 +5,27 @@ Note: pytest-aiohttp is used for async mocking of aiohttp client session.
 Note: pytest-asyncio is used for running async tests.
 """
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock
-from aiohttp import ClientSession, ClientResponse
 import json
+import os
+import sys
+from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+from aiohttp import ClientResponse, ClientSession
+
+ROOT_DIR = Path(__file__).resolve().parents[1]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
+os_environ_defaults = {
+    "JIRA_URL": "https://example.atlassian.net",
+    "JIRA_USERNAME": "test@example.com",
+    "JIRA_API_TOKEN": "token",
+}
+
+for key, value in os_environ_defaults.items():
+    os.environ.setdefault(key, value)
 
 
 @pytest.fixture
