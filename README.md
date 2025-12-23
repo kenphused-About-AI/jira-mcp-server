@@ -37,18 +37,35 @@ The project uses:
 ## Project Structure
 ```txt
 jira-mcp-server/
-├── jira_mcp/
-│   ├── __init__.py
-│   ├── app.py            # HTTPS entrypoint
-│   ├── config.py         # Environment & server config
-│   ├── http_client.py    # aiohttp session handling
-│   ├── jira_api.py       # Jira REST API wrapper
-│   ├── sanitization.py  # Input validation
-│   ├── server.py         # FastMCP server
-│   └── tools.py          # MCP tool definitions
+├── AGENTS.md
+├── docs
+│   ├── 251223-JIRA-PROJECT-KEY-VALIDATION.md
+│   ├── agents
+│   │   ├── 251217-RECOMMENDATIONS.md
+│   │   ├── 251217-TEST-TODO.md
+│   │   ├── 251217-UNIT-TEST-DETAILS.md
+│   │   ├── 251217-UPDATES.md
+│   │   └── 251219-TOOL-IMPLEMENTATION.md
+│   ├── SECURITY.md
+│   └── SETUP-GUIDE.md
+├── jira_mcp
+│   ├── app.py
+│   ├── config.py
+│   ├── http_client.py
+│   ├── __init__.py
+│   ├── jira_api.py
+│   ├── sanitization.py
+│   ├── server.py
+│   └── tools.py
+├── main.py
 ├── pyproject.toml
 ├── README.md
-└── .gitignore
+├── tests
+│   ├── conftest.py
+│   ├── test_jira_api_error_handling.py
+│   ├── test_sanitization.py
+│   └── test_tools.py
+└── uv.lock
 ```
 
 ---
