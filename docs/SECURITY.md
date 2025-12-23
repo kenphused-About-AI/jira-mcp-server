@@ -1,7 +1,7 @@
 # Security
 
-This document defines the security posture, TLS configuration, and certificate management practices for this MCP server.  
-It is aligned with MCP security best practices and is intended for both human readers and AI agents.
+This document defines the security posture, TLS configuration, and certificate management practices for this MCP server.
+It is aligned with MCP security best practices and is intended for both human readers and AI agents. TLS is recommended and should be enforced by a forwarding proxy (Nginx, Cloudflare, Pangolin, ContextForge, etc.) or configured directly on the MCP server when a proxy is not available.
 
 ---
 
@@ -23,11 +23,11 @@ This document **does not** define application-level authentication or authorizat
 
 The MCP server follows these core security principles:
 
-- **HTTPS is mandatory** — plaintext transport is not supported.
-- **TLS 1.2+ required** — TLS 1.3 preferred where available.
+- **Encrypted transport is mandatory for exposed endpoints** — use a TLS-terminating forwarding proxy whenever possible. Direct TLS on the MCP server is supported for environments without a proxy, but plaintext should only be used on trusted, internal segments between the proxy and server.
+- **TLS 1.2+ required** — TLS 1.3 preferred where available when you terminate TLS (proxy or service).
 - **Least privilege** for keys and certificates.
-- **Explicit trust** — clients must intentionally trust the server.
-- **Fail closed** — misconfigured TLS must prevent startup.
+- **Explicit trust** — clients must intentionally trust the server or proxy certificate.
+- **Fail closed** — misconfigured TLS must prevent startup for directly terminated TLS; proxies should reject insecure configurations.
 
 ---
 
@@ -35,14 +35,19 @@ The MCP server follows these core security principles:
 
 ### Protocol Versions
 
-The server MUST:
+When terminating TLS on a forwarding proxy, configure the proxy to:
+
+- Enable **TLS 1.2 and TLS 1.3**.
+- Disable **TLS 1.0 and TLS 1.1**.
+
+When terminating TLS directly on the MCP server, configure the server to:
 
 - Enable **TLS 1.2 and TLS 1.3**.
 - Disable **TLS 1.0 and TLS 1.1**.
 
 ### Cipher Suites
 
-The server SHOULD:
+The TLS terminator (proxy or server) SHOULD:
 
 - Prefer modern AEAD ciphers (e.g., ECDHE with AES-GCM or CHACHA20-POLY1305).
 - Disable weak or legacy ciphers (e.g., RC4, 3DES, EXPORT ciphers).
@@ -60,7 +65,7 @@ Self-signed certificates are supported for:
 - Test environments
 - Internal or isolated networks where both server and client are under control
 
-Self-signed certificates MUST NOT be used for public internet exposure or untrusted networks.
+Self-signed certificates MUST NOT be used for public internet exposure or untrusted networks. If you use a forwarding proxy, terminate TLS on the proxy with the certificate type appropriate for the environment (self-signed for dev, CA-issued for production) and forward HTTP to the MCP server over a trusted segment.
 
 ### CA-Issued Certificates
 
@@ -69,6 +74,8 @@ CA-issued certificates are REQUIRED for:
 - Public-facing endpoints
 - Third-party clients
 - Production environments
+
+Use them on the TLS-terminating proxy or directly on the MCP server if you cannot front it with a proxy.
 
 Supported certificate authorities include:
 
@@ -332,10 +339,10 @@ Review:
 
 ## MCP-Specific Considerations
 
-- HTTPS is REQUIRED for this MCP server.
-- TLS misconfiguration MUST prevent successful startup rather than allowing a downgraded or insecure mode.
+- HTTPS is REQUIRED for any client-facing endpoint. You can satisfy this by terminating TLS on a forwarding proxy or by enabling TLS directly on the MCP server; plaintext should only be used on the trusted hop between proxy and server.
+- TLS misconfiguration MUST prevent successful startup rather than allowing a downgraded or insecure mode when you terminate TLS directly on the service; proxies should likewise reject invalid TLS settings.
 - The server does not make **implicit trust** assumptions; the client is responsible for deciding which CAs and certificates to trust.
-- All MCP communication over the network is expected to occur over a secure TLS channel.
+- All MCP communication over the network that leaves the trusted segment is expected to occur over a secure TLS channel.
 
 ---
 

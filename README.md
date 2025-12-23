@@ -1,19 +1,19 @@
 # Jira MCP Server
 
-A secure Model Context Protocol (MCP) server for interacting with Jira Cloud over HTTPS.
+A secure Model Context Protocol (MCP) server for interacting with Jira Cloud. For encrypted transport, run it behind a TLS-terminating proxy.
 This server exposes Jira functionality (search, issues, comments, transitions, projects) as MCP tools, enabling integration with agent frameworks such as Langflow, Goose, and OpenWebUI.
 
 The project uses:
 - FastMCP (HTTP/HTTPS MCP transport)
 - aiohttp for async Jira API access
 - uv for dependency and environment management
-- TLS-only communication (no stdio)
+- HTTPS-capable transport (no stdio)
 
 ---
 
 ## Features
 
-- HTTPS-only MCP server
+- HTTPS-capable MCP server (pair with a TLS-terminating proxy to enforce encryption; direct TLS on the server remains optional)
 - JQL search with pagination support
 - Get issues, comments, transitions, and projects
 - Create, update, comment, and transition Jira issues
@@ -29,8 +29,9 @@ The project uses:
 - Python 3.11+
 - Jira Cloud account
 - Jira API token
-- TLS certificate and key (self-signed or trusted)
 - uv (https://github.com/astral-sh/uv)
+
+To ensure encrypted traffic, deploy behind a forwarding proxy such as Nginx, Cloudflare, Pangolin, or ContextForge that terminates TLS and forwards requests to the MCP server. Running the MCP server without TLS is supported when it is isolated behind a trusted TLS front end.
 
 ---
 
@@ -99,16 +100,18 @@ export JIRA_API_TOKEN="your-api-token"
 export MCP_BIND_HOST="0.0.0.0"
 export MCP_BIND_PORT="8443"
 
+IMPORTANT: JIRA_URL must use HTTPS. If you terminate TLS on this service, also set:
+
 export MCP_TLS_CERT="cert.pem"
 export MCP_TLS_KEY="key.pem"
 
-IMPORTANT: JIRA_URL must use HTTPS.
+Otherwise, configure TLS on your proxy. When TLS is handled by a forwarding proxy, you may run the MCP server over HTTP inside the trusted network segment it serves.
 
 ---
 
 ## TLS Certificates
 
-For local development, you can generate a self-signed certificate:
+If you terminate TLS on this service, you can generate a self-signed certificate for local development:
 
 openssl req -x509 -newkey rsa:4096 \
   -keyout key.pem \
@@ -116,7 +119,7 @@ openssl req -x509 -newkey rsa:4096 \
   -days 365 \
   -nodes
 
-For production, use a trusted certificate such as Let’s Encrypt.
+For production, use a trusted certificate such as Let’s Encrypt or terminate TLS on a forwarding proxy (Nginx, Cloudflare, Pangolin, or ContextForge) and forward HTTP to the MCP server.
 
 ---
 
@@ -132,7 +135,7 @@ uv run python -m jira_mcp.app
 
 The MCP server will start on:
 
-https://<host>:<port>
+https://<host>:<port> when TLS variables are set, or http://<host>:<port> when TLS is terminated by a forwarding proxy.
 
 ---
 
@@ -174,7 +177,7 @@ project = MAX AND status = "In Progress"
 
 ## Security Notes
 
-- TLS is required
+- Use TLS via a forwarding proxy (Nginx, Cloudflare, Pangolin, or ContextForge) or by configuring `MCP_TLS_CERT` and `MCP_TLS_KEY` on the service
 - Jira credentials are read only from environment variables
 - No credentials are logged
 - Endpoints and JQL are sanitized
