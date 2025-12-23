@@ -1,7 +1,14 @@
 """Unit tests for sanitization functions."""
 
 import pytest
-from jira_mcp.sanitization import sanitize_jql, sanitize_endpoint
+from jira_mcp.sanitization import (
+    sanitize_comment_body,
+    sanitize_endpoint,
+    sanitize_issue_key,
+    sanitize_jql,
+    sanitize_project_key,
+    sanitize_transition_id,
+)
 
 
 class TestSanitizeJQL:
@@ -103,3 +110,66 @@ class TestSanitizeEndpoint:
         """Non-alphanumeric characters should raise ValueError."""
         with pytest.raises(ValueError, match="Invalid endpoint"):
             sanitize_endpoint("issue/ABC-123!comment")
+
+
+class TestSanitizeIssueKey:
+    """Test Jira issue key validation."""
+
+    def test_accepts_standard_key(self):
+        result = sanitize_issue_key("proj-123")
+        assert result == "PROJ-123"
+
+    def test_rejects_missing_number(self):
+        with pytest.raises(ValueError, match="Invalid issue key format"):
+            sanitize_issue_key("PROJ-")
+
+    def test_rejects_empty_value(self):
+        with pytest.raises(ValueError, match="Issue key must be non-empty"):
+            sanitize_issue_key("   ")
+
+
+class TestSanitizeProjectKey:
+    """Test Jira project key validation."""
+
+    def test_accepts_alphanumeric_key(self):
+        result = sanitize_project_key("proj1")
+        assert result == "PROJ1"
+
+    def test_rejects_invalid_format(self):
+        with pytest.raises(ValueError, match="Invalid project key format"):
+            sanitize_project_key("proj-1")
+
+    def test_rejects_empty_project(self):
+        with pytest.raises(ValueError, match="Project key must be non-empty"):
+            sanitize_project_key("")
+
+
+class TestSanitizeCommentBody:
+    """Test Jira comment body validation."""
+
+    def test_accepts_basic_comment(self):
+        result = sanitize_comment_body(" Looks good to me. ")
+        assert result == "Looks good to me."
+
+    def test_rejects_forbidden_characters(self):
+        with pytest.raises(ValueError, match="Invalid character in comment body"):
+            sanitize_comment_body("Bad | body")
+
+    def test_rejects_empty(self):
+        with pytest.raises(ValueError, match="Comment body must be non-empty"):
+            sanitize_comment_body("   ")
+
+
+class TestSanitizeTransitionId:
+    """Test transition ID validation."""
+
+    def test_accepts_numeric_string(self):
+        assert sanitize_transition_id(" 42 ") == "42"
+
+    def test_rejects_non_numeric(self):
+        with pytest.raises(ValueError, match="Transition ID must be numeric"):
+            sanitize_transition_id("abc")
+
+    def test_rejects_empty_transition(self):
+        with pytest.raises(ValueError, match="Transition ID must be non-empty"):
+            sanitize_transition_id("")
