@@ -12,8 +12,8 @@ This document describes how to:
 All examples assume:
 
 - Your MCP server is implemented in Python with FastMCP (or a similar MCP framework).
-- You are running it over HTTPS on `https://localhost:8443`.
-- You have already created TLS certificates as described in your SECURITY documentation.
+- You are either terminating TLS on a forwarding proxy (recommended for production) or running direct TLS on the MCP server for development.
+- If you terminate TLS on the MCP server, you have already created certificates as described in your SECURITY documentation.
 
 You will need to adjust paths, names, and environment variables to match your project.
 
@@ -69,7 +69,7 @@ Define any environment variables your MCP server needs. Common patterns:
   - `JIRA_BASE_URL` — base URL, e.g. `https://your-domain.atlassian.net`
   - `JIRA_EMAIL` — Jira user email
   - `JIRA_API_TOKEN` — API token (keep this secret)
-- TLS configuration:
+- TLS configuration (only when terminating TLS on the MCP server instead of a proxy):
   - `TLS_CERT_FILE` — path to `server.crt`
   - `TLS_KEY_FILE` — path to `server.key`
 - Port and host:
@@ -86,16 +86,24 @@ You can set these in a `.env` file or your shell:
     export MCP_HOST="0.0.0.0"
     export MCP_PORT="8443"
 
-### 1.4. Running the MCP Server (HTTPS)
+### 1.4. Running the MCP Server (HTTPS or behind a TLS proxy)
 
 If you are using FastMCP with a `fastmcp.json` configuration, a common pattern is:
 
     # Example: run via FastMCP using a config file
+    # Direct TLS on the MCP server
     uv run fastmcp run fastmcp.json \
       --host "$MCP_HOST" \
       --port "$MCP_PORT" \
       --cert-file "$TLS_CERT_FILE" \
       --key-file "$TLS_KEY_FILE"
+
+If you terminate TLS on a forwarding proxy (Nginx, Cloudflare, Pangolin, ContextForge, etc.), run the MCP server without TLS and point the proxy at the server’s HTTP port:
+
+    # HTTP-only behind a trusted TLS-terminating proxy
+    uv run fastmcp run fastmcp.json \
+      --host "$MCP_HOST" \
+      --port "$MCP_PORT"
 
 Or, if your server is defined directly in Python, for example `mcp_server/server.py`:
 
@@ -111,13 +119,16 @@ Or, if your server is defined directly in Python, for example `mcp_server/server
       }
     }
 
-Run it:
+Run it (direct TLS example):
 
     uv run fastmcp run fastmcp.json \
       --host "$MCP_HOST" \
       --port "$MCP_PORT" \
       --cert-file "$TLS_CERT_FILE" \
       --key-file "$TLS_KEY_FILE"
+
+Or, if TLS is terminated on a forwarding proxy, omit the certificate flags and configure the proxy to forward HTTPS traffic to
+ the MCP server’s HTTP endpoint.
 
 If you’re not using FastMCP’s CLI, your `server.py` might contain something like:
 
@@ -153,7 +164,7 @@ Before integrating with clients, verify that:
 
 ### 2.1. Basic Connectivity and TLS Check
 
-Use curl to check the HTTPS port is reachable. This does **not** speak MCP, but confirms TLS and networking.
+Use curl to check the HTTPS port is reachable. This does **not** speak MCP, but confirms TLS and networking. If you terminate TLS on a forwarding proxy, run curl against the proxy endpoint; if you are running HTTP-only behind a trusted proxy, test against the proxy’s HTTPS listener rather than the internal HTTP port.
 
 For a self-signed certificate:
 
