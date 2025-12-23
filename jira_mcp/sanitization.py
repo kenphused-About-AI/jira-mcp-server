@@ -42,7 +42,10 @@ def sanitize_project_key(project_key: str) -> str:
     if not normalized_key:
         raise ValueError("Project key must be non-empty")
 
-    if not re.fullmatch(r"[A-Z][A-Z0-9_]+", normalized_key):
+    if not normalized_key[0].isalpha():
+        raise ValueError("Project key must start with a letter")
+
+    if not re.fullmatch(r"[A-Z][A-Z0-9_]{1,9}", normalized_key):
         raise ValueError("Invalid project key format")
 
     return normalized_key
