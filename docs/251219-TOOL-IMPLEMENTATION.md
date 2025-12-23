@@ -4,12 +4,19 @@
 - Add the nine Jira MCP tools advertised in the README but not yet implemented.
 - Keep tooling consistent with existing patterns: async handlers, sanitized inputs, and centralized HTTP access via `jira_mcp.jira_api.jira_request`.
 - Ensure each tool is documented in schemas and validated through automated tests.
+- Document expectations clearly so the work is unblockable for future contributors and traceable against README promises.
 
 ## Guiding Principles
 - **Security & Validation:** Reuse `sanitize_jql` for JQL inputs and extend sanitization with helper validators for issue keys, project keys, comment bodies, and transition IDs. Reject empty or malformed inputs with `ValueError`.
 - **HTTP Layer:** Use `jira_request` for all Jira REST calls. Favor explicit endpoints (e.g., `issue/{key}`, `issue/{key}/comment`) and keep methods clear (`GET`, `POST`, `PUT`).
 - **Consistency:** Mirror existing `search_jira` structure: handler functions plus `Tool` schemas registered in `TOOLS` and `TOOL_SCHEMAS`.
 - **Tests:** Add coverage for tool input validation, schema defaults, and HTTP invocation shapes using mocks to avoid live Jira calls.
+
+## Definition of Done
+- All nine tools are exposed through `TOOLS` and `TOOL_SCHEMAS` with JSON schema defaults that match README defaults.
+- Validators for JQL, issue keys, project keys, transition IDs, and comment bodies are unit-tested and imported where handlers need them.
+- README and `docs/SETUP-GUIDE.md` list the new tools with parameters, defaults, and usage notes.
+- Automated checks remain green: `uv run ruff check .`, `uv run mypy jira_mcp`, and `uv run pytest`.
 
 ## Implementation Steps
 1. **Input Validation Helpers**
@@ -30,6 +37,7 @@
      - `transition_jira_issue`: POST `issue/{issueKey}/transitions` with transition ID.
    - Validate inputs inside each handler before calling Jira.
    - Ensure defaults (e.g., `maxResults`, `startAt`) match README expectations and existing `search_jira` behavior.
+   - Keep responses consistently shaped (e.g., returning raw Jira payloads) to align with `search_jira` and simplify clients.
 
 3. **Tool Schemas in `jira_mcp/tools.py`**
    - Add `Tool` entries for each handler with descriptive names and JSON schemas that enforce required fields, types, and defaults.
