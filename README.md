@@ -73,12 +73,14 @@ jira-mcp-server/
 
 1. Clone the repository
 
-git clone https://github.com/your-org/jira-mcp-server.git
+git clone https://github.com/kenphused-About-AI/jira-mcp-server/
+
 cd jira-mcp-server
 
 2. Initialize the environment
 
 uv venv
+
 source .venv/bin/activate
 
 3. Install dependencies
@@ -86,7 +88,7 @@ source .venv/bin/activate
 uv sync
 
 ---
-
+```txt
 ## Configuration
 
 Set the following environment variables:
@@ -94,10 +96,7 @@ Set the following environment variables:
 export JIRA_URL="https://your-domain.atlassian.net"
 export JIRA_USERNAME="email@example.com"
 export JIRA_API_TOKEN="your-api-token"
-
-export MCP_BIND_HOST="0.0.0.0"
-export MCP_BIND_PORT="8000"
-
+```
 ---
 
 ## TLS (Optional)
