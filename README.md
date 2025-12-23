@@ -36,7 +36,6 @@ The project uses:
 
 ## Project Structure
 ```txt
-```
 jira-mcp-server/
 ├── jira_mcp/
 │   ├── __init__.py
@@ -51,7 +50,7 @@ jira-mcp-server/
 ├── README.md
 └── .gitignore
 ```
-```
+
 ---
 
 ## Installation
