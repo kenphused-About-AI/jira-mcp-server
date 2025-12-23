@@ -1,6 +1,7 @@
 [project]
 name = "jira-mcp-server"
-version = "0.1.0"
+version = "0.1.3"
+author = "kenphused"
 description = "MCP Server to Access Cloud Jira Instances"
 readme = "README.md"
 requires-python = ">=3.11"
