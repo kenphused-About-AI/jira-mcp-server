@@ -119,6 +119,38 @@ The MCP server will start on:
 
 hhttp://<host>:<port> by default, or https://<host>:<port> when TLS is configured.
 
+## Example MCP Client Configuration
+
+To launch the server from an MCP-compatible client (for example, Claude Desktop), 
+you can point the client at this repository using `uvx` with a `--from` path. 
+The MCP client will set the Jira credentials through environment variables and 
+start the packaged `jira-mcp-server` console script:
+
+```json
+{
+  "mcpServers": {
+    "jira-mcp-server": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "/path/to/jira-mcp-server",
+        "jira-mcp-server"
+      ],
+      "env": {
+        "JIRA_URL": "https://your-domain.atlassian.net",
+        "JIRA_USERNAME": "email@example.com",
+        "JIRA_API_TOKEN": "your-api-token"
+      }
+    }
+  }
+}
+```
+
+Replace `/path/to/jira-mcp-server` with the local checkout location. The console 
+entrypoint defined in `pyproject.toml` ensures the same `jira_mcp.app` runtime is 
+used regardless of whether the package is installed globally or launched from a 
+local directory with `uvx --from`.
+
 ---
 
 ## Available MCP Tools
