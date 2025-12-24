@@ -105,7 +105,7 @@ def sanitize_issue_key(issue_key: str) -> str:
     if not normalized_key:
         raise ValueError("Issue key must be non-empty")
 
-    if not re.fullmatch(r"[A-Z][A-Z0-9]+-\\d+", normalized_key):
+    if not re.fullmatch(r"[A-Z][A-Z0-9]+-\d+", normalized_key):
         raise ValueError("Invalid issue key format")
 
     return normalized_key
