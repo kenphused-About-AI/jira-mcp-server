@@ -2,6 +2,7 @@
 
 import pytest
 from jira_mcp.sanitization import (
+    MAX_JQL_LENGTH,
     sanitize_comment_body,
     sanitize_endpoint,
     sanitize_issue_key,
@@ -34,22 +35,22 @@ class TestSanitizeJQL:
 
     def test_invalid_null_byte(self):
         """Null bytes should raise ValueError."""
-        with pytest.raises(ValueError, match="Invalid character in JQL"):
+        with pytest.raises(ValueError, match="Control characters not allowed in JQL"):
             sanitize_jql("project = TEST\x00")
 
     def test_invalid_backtick(self):
         """Backticks should raise ValueError."""
-        with pytest.raises(ValueError, match="Invalid character in JQL"):
+        with pytest.raises(ValueError, match="Invalid characters in JQL query"):
             sanitize_jql("project = TEST`")
 
     def test_invalid_pipe_character(self):
         """Pipe characters should raise ValueError."""
-        with pytest.raises(ValueError, match=r"Invalid character in JQL\."):
+        with pytest.raises(ValueError, match=r"Invalid characters in JQL query"):
             sanitize_jql("project = TEST | status = Open")
 
     def test_invalid_ampersand_character(self):
         """Ampersands should raise ValueError."""
-        with pytest.raises(ValueError, match=r"Invalid character in JQL\."):
+        with pytest.raises(ValueError, match=r"Invalid characters in JQL query"):
             sanitize_jql("project = TEST & status = Open")
 
     def test_invalid_empty_string(self):
@@ -62,6 +63,32 @@ class TestSanitizeJQL:
         jql = "  project = TEST  "
         result = sanitize_jql(jql)
         assert result == "project = TEST"
+
+    def test_rejects_overlength(self):
+        """Queries longer than MAX_JQL_LENGTH should be rejected."""
+        overlong = "A" * (MAX_JQL_LENGTH + 1)
+        with pytest.raises(ValueError, match="JQL query too long"):
+            sanitize_jql(overlong)
+
+    def test_rejects_control_characters(self):
+        """Control characters should be rejected even if allowlisted range matches."""
+        with pytest.raises(ValueError, match="Control characters not allowed in JQL"):
+            sanitize_jql("project = TEST\x07")
+
+    def test_rejects_bidi_characters(self):
+        """Bidirectional control characters should be rejected."""
+        with pytest.raises(ValueError, match="Bidirectional control characters not allowed"):
+            sanitize_jql("project = TEST\u202E")
+
+    def test_rejects_unbalanced_mixed_quotes(self):
+        """Different quote types must close independently."""
+        with pytest.raises(ValueError, match="Unbalanced quotes"):
+            sanitize_jql("project = 'TEST\"")
+
+    def test_rejects_unbalanced_parentheses(self):
+        """Parentheses must be balanced outside of quoted strings."""
+        with pytest.raises(ValueError, match="Unbalanced parentheses"):
+            sanitize_jql("project = TEST AND (status = Open")
 
 
 class TestSanitizeEndpoint:
