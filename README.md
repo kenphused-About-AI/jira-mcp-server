@@ -88,14 +88,25 @@ source .venv/bin/activate
 uv sync
 
 ---
-```txt
 ## Configuration
 
 Set the following environment variables:
 
+- **JIRA_URL** (required): Jira Cloud base URL. Must use HTTPS; HTTP values will raise a `ValueError` at startup.
+- **JIRA_USERNAME** (required): Jira username (usually your email address).
+- **JIRA_API_TOKEN** (required): Jira API token for basic authentication.
+- **MCP_BIND_HOST** (optional): Host interface for the MCP server. Defaults to `0.0.0.0`.
+- **MCP_BIND_PORT** (optional): Port for the MCP server. Defaults to `8443`.
+
+Example:
+
+```bash
 export JIRA_URL="https://your-domain.atlassian.net"
 export JIRA_USERNAME="email@example.com"
 export JIRA_API_TOKEN="your-api-token"
+# Optional overrides
+export MCP_BIND_HOST="127.0.0.1"
+export MCP_BIND_PORT="8080"
 ```
 ---
 
@@ -115,9 +126,12 @@ Or directly:
 
 uv run python -m jira_mcp.app
 
+You can also start the server with `python -m jira_mcp` thanks to the package's
+module entrypoint.
+
 The MCP server will start on:
 
-hhttp://<host>:<port> by default, or https://<host>:<port> when TLS is configured.
+http://<host>:<port> by default, or https://<host>:<port> when TLS is configured.
 
 ## Example MCP Client Configuration
 
