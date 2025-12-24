@@ -32,8 +32,7 @@ KNOWN_ENDPOINT_SEGMENTS = {
 ALLOWED_CHARACTERS = re.compile(r"^[a-zA-Z0-9/_-]+$")
 
 JQL_ALLOWLIST_PATTERN = re.compile(
-    r"^[	
- \u0020-~]+$"
+    r"^[\t\n\r \\u0020-~]+$"
 )
 
 CONTROL_CHARACTERS = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]")
