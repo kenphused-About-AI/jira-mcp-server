@@ -3,6 +3,16 @@ Configuration module for the Jira MCP Server.
 
 This module provides runtime configuration through environment variables,
 ensuring secure and flexible deployment options.
+
+Environment Variables:
+    JIRA_URL: Jira Cloud instance URL (required, must use HTTPS)
+    JIRA_USERNAME: Jira username (required, typically email address)
+    JIRA_API_TOKEN: Jira API token for authentication (required)
+    MCP_BIND_HOST: Host address to bind the MCP server to (optional, default: 0.0.0.0)
+    MCP_BIND_PORT: Port to bind the MCP server to (optional, default: 8443)
+
+Raises:
+    ValueError: If JIRA_URL doesn't use HTTPS protocol
 """
 
 import os
