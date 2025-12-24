@@ -32,12 +32,13 @@ KNOWN_ENDPOINT_SEGMENTS = {
 ALLOWED_CHARACTERS = re.compile(r"^[a-zA-Z0-9/_-]+$")
 
 JQL_ALLOWLIST_PATTERN = re.compile(
-    r"^[\t\n\r \\u0020-~]+$"
+    # Tabs/newlines plus printable characters excluding control ranges
+    r"^[\t\n\r \u0020-\u007E\u00A0-\uFFFF]+$"
 )
 
 CONTROL_CHARACTERS = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]")
 
-FORBIDDEN_JQL_CHARS = re.compile(r'[`;|&\\"]')
+FORBIDDEN_JQL_CHARS = re.compile(r"[`;|&\\]")
 
 FORBIDDEN_COMMENT_CHARS = re.compile(r'[\x00`;|&\\"]')
 
@@ -61,20 +62,34 @@ def sanitize_endpoint(endpoint: str) -> str:
     if normalized.startswith("/") or ".." in normalized:
         raise ValueError("Path traversal detected")
 
-    # Validate that all top-level segments are known
-    segments = normalized.split("/")
-    for segment in segments:
-        if segment and segment not in KNOWN_ENDPOINT_SEGMENTS:
-            raise ValueError(f"Unknown endpoint segment: {segment}")
-
     return normalized
 
 
 def sanitize_jql(jql: str) -> str:
+    """Validate and normalize a JQL (Jira Query Language) expression.
+
+    The sanitizer enforces:
+    - Non-empty string input trimmed of surrounding whitespace
+    - A strict allowlist of printable characters (excluding control characters)
+    - Maximum length of ``MAX_JQL_LENGTH``
+    - Rejection of shell/meta characters (````, ``;``, ``|``, ``&``, ``\\``)
+    - Explicit control-character and Unicode bidi checks
+    - Structured balancing for quotes and parentheses (each quote type tracked
+      independently and parentheses only counted when not inside quotes)
+
+    Args:
+        jql: The JQL query string.
+
+    Returns:
+        The normalized JQL string with collapsed internal whitespace.
+
+    Raises:
+        ValueError: If validation fails for any of the rules above.
+    """
+
     if not isinstance(jql, str) or not jql.strip():
         raise ValueError("JQL must be non-empty")
 
-    original_jql = jql
     jql = jql.strip()
 
     if len(jql) > MAX_JQL_LENGTH:
@@ -86,27 +101,51 @@ def sanitize_jql(jql: str) -> str:
     if CONTROL_CHARACTERS.search(jql):
         raise ValueError("Control characters not allowed in JQL")
 
-    # Check for forbidden characters
-    if FORBIDDEN_JQL_CHARS.search(jql):
-        raise ValueError("Invalid characters in JQL query")
-
     # Check for Unicode bidirectional control characters
     if UNICODE_BIDIControl.search(jql):
         raise ValueError(
             "Bidirectional control characters not allowed in JQL"
         )
 
+    # Check for forbidden characters
+    if FORBIDDEN_JQL_CHARS.search(jql):
+        raise ValueError("Invalid characters in JQL query")
+
+    if not JQL_ALLOWLIST_PATTERN.fullmatch(jql):
+        raise ValueError("Invalid characters in JQL query")
+
     # Normalize whitespace: collapse multiple spaces and newlines
     jql = re.sub(r"\s+", " ", jql)
 
-    # Check for balanced quotes and parentheses
-    open_quotes = jql.count('"') + jql.count("'")
-    if open_quotes % 2 != 0:
+    # Structured balance checks (ignore parentheses while inside quotes)
+    parentheses_stack: list[str] = []
+    active_quote: str | None = None
+    unclosed_quotes = {"'": 0, '"': 0}
+
+    for char in jql:
+        if char in unclosed_quotes:
+            if active_quote is None:
+                active_quote = char
+                unclosed_quotes[char] += 1
+            elif active_quote == char:
+                unclosed_quotes[char] -= 1
+                active_quote = None
+            continue
+
+        if active_quote:
+            continue
+
+        if char == "(":
+            parentheses_stack.append(char)
+        elif char == ")":
+            if not parentheses_stack:
+                raise ValueError("Unbalanced parentheses in JQL query")
+            parentheses_stack.pop()
+
+    if active_quote is not None or any(count != 0 for count in unclosed_quotes.values()):
         raise ValueError("Unbalanced quotes in JQL query")
 
-    open_parens = jql.count("(")
-    close_parens = jql.count(")")
-    if open_parens != close_parens:
+    if parentheses_stack:
         raise ValueError("Unbalanced parentheses in JQL query")
 
     return jql
@@ -173,7 +212,7 @@ def sanitize_comment_body(body: str) -> str:
 
     # Check for forbidden characters
     if FORBIDDEN_COMMENT_CHARS.search(body):
-        raise ValueError("Invalid characters in comment body")
+        raise ValueError("Invalid character in comment body")
 
     # Check for Unicode bidirectional control characters
     if UNICODE_BIDIControl.search(body):
@@ -194,14 +233,18 @@ def sanitize_comment_body(body: str) -> str:
 
 
 def sanitize_transition_id(transition_id: str) -> str:
-    if not isinstance(transition_id, str) or not transition_id.strip():
-        raise ValueError("Transition ID must be a non-empty string")
+    if not isinstance(transition_id, str):
+        raise ValueError("Transition ID must be a string")
+
+    trimmed_id = transition_id.strip()
+    if not trimmed_id:
+        raise ValueError("Transition ID must be non-empty")
 
     # Convert to integer to validate and normalize
     try:
-        num = int(transition_id)
+        num = int(trimmed_id)
     except ValueError:
-        raise ValueError("Transition ID must be a number")
+        raise ValueError("Transition ID must be numeric")
 
     if num <= 0:
         raise ValueError("Transition ID must be positive")
@@ -216,217 +259,3 @@ def sanitize_transition_id(transition_id: str) -> str:
 
 
 
-def sanitize_endpoint(endpoint: str) -> str:
-    """
-    Sanitize Jira API endpoint to prevent path traversal.
-
-    Args:
-        endpoint: The API endpoint (e.g., 'issue/KEY-123', 'search')
-
-    Returns:
-        The sanitized endpoint string
-
-    Raises:
-        ValueError: If endpoint contains invalid characters or path traversal attempts
-
-    Examples:
-        >>> sanitize_endpoint('issue/KEY-123')
-        'issue/KEY-123'
-
-        >>> sanitize_endpoint('issue/../../../etc/passwd')
-        ValueError: Path traversal detected
-    """
-    if not re.fullmatch(r"[a-zA-Z0-9/_-]+", endpoint):
-        raise ValueError("Invalid endpoint")
-    if endpoint.startswith("/") or ".." in endpoint:
-        raise ValueError("Path traversal detected")
-    return endpoint
-
-
-def sanitize_jql(jql: str) -> str:
-    """
-    Sanitize JQL (Jira Query Language) to prevent injection.
-
-    Validates that the JQL string:
-    - Is non-empty
-    - Doesn't contain backticks (code injection)
-    - Doesn't contain null bytes (termination attacks)
-    - Doesn't contain shell meta-characters
-
-    Args:
-        jql: The JQL query string
-
-    Returns:
-        The sanitized JQL string (trimmed)
-
-    Raises:
-        ValueError: If JQL contains forbidden characters or is empty
-
-    Examples:
-        >>> sanitize_jql('project = DSP ORDER BY updated DESC')
-        'project = DSP ORDER BY updated DESC'
-
-        >>> sanitize_jql('`REVERT --help`')
-        ValueError: Invalid character in JQL.
-    """
-    if not isinstance(jql, str) or not jql.strip():
-        raise ValueError("JQL must be non-empty")
-
-    forbidden = ["`", "\x00", "|", "&"]
-    if any(c in jql for c in forbidden):
-        raise ValueError("Invalid character in JQL.")
-
-    return jql.strip()
-
-
-def sanitize_issue_key(issue_key: str) -> str:
-    """
-    Sanitize and validate Jira issue key format.
-
-    Valid issue keys must match the pattern: PROJECTNUMBER-SEQUENCE
-    where PROJECT is uppercase letters, and NUMBER is digits.
-
-    Args:
-        issue_key: The issue key (e.g., 'KEY-123', 'MAX-456')
-
-    Returns:
-        The normalized, uppercase issue key
-
-    Raises:
-        ValueError: If issue key format is invalid
-
-    Examples:
-        >>> sanitize_issue_key('KEY-123')
-        'KEY-123'
-
-        >>> sanitize_issue_key('invalid')
-        ValueError: Invalid issue key format
-    """
-    if not isinstance(issue_key, str):
-        raise ValueError("Issue key must be a string")
-
-    normalized_key = issue_key.strip().upper()
-    if not normalized_key:
-        raise ValueError("Issue key must be non-empty")
-
-    if not re.fullmatch(r"[A-Z][A-Z0-9]+-\d+", normalized_key):
-        raise ValueError("Invalid issue key format")
-
-    return normalized_key
-
-
-def sanitize_project_key(project_key: str) -> str:
-    """
-    Sanitize and validate Jira project key format.
-
-    Valid project keys must:
-    - Start with a letter
-    - Contain only alphanumeric characters and underscores
-    - Be 2-10 characters long
-
-    Args:
-        project_key: The project key (e.g., 'DSP', 'MAX', 'CUSTOMER_Portal')
-
-    Returns:
-        The normalized, uppercase project key
-
-    Raises:
-        ValueError: If project key format is invalid
-
-    Examples:
-        >>> sanitize_project_key('DSP')
-        'DSP'
-
-        >>> sanitize_project_key('1INVALID')
-        ValueError: Project key must start with a letter
-    """
-    if not isinstance(project_key, str):
-        raise ValueError("Project key must be a string")
-
-    normalized_key = project_key.strip().upper()
-    if not normalized_key:
-        raise ValueError("Project key must be non-empty")
-
-    if not normalized_key[0].isalpha():
-        raise ValueError("Project key must start with a letter")
-
-    if not re.fullmatch(r"[A-Z][A-Z0-9_]{1,9}", normalized_key):
-        raise ValueError("Invalid project key format")
-
-    return normalized_key
-
-
-def sanitize_comment_body(body: str) -> str:
-    """
-    Sanitize comment body text to prevent injection attacks.
-
-    Validates that comment:
-    - Is non-empty
-    - Doesn't contain backticks (code injection)
-    - Doesn't contain null bytes
-    - Doesn't contain shell meta-characters
-
-    Args:
-        body: The comment body text
-
-    Returns:
-        The sanitized comment text (trimmed)
-
-    Raises:
-        ValueError: If comment contains forbidden characters or is empty
-
-    Examples:
-        >>> sanitize_comment_body('Fixed the issue')
-        'Fixed the issue'
-
-        >>> sanitize_comment_body('')
-        ValueError: Comment body must be non-empty
-    """
-    if not isinstance(body, str):
-        raise ValueError("Comment body must be a string")
-
-    trimmed_body = body.strip()
-    if not trimmed_body:
-        raise ValueError("Comment body must be non-empty")
-
-    forbidden = ["\x00", "`", "|", "&"]
-    if any(char in trimmed_body for char in forbidden):
-        raise ValueError("Invalid character in comment body")
-
-    return trimmed_body
-
-
-def sanitize_transition_id(transition_id: str) -> str:
-    """
-    Sanitize and validate Jira transition ID.
-
-    Transition IDs must be numeric values representing the transition ID
-    in the Jira workflow.
-
-    Args:
-        transition_id: The transition ID (e.g., '11', '21')
-
-    Returns:
-        The sanitized, trimmed transition ID
-
-    Raises:
-        ValueError: If transition ID is not numeric or empty
-
-    Examples:
-        >>> sanitize_transition_id('11')
-        '11'
-
-        >>> sanitize_transition_id('invalid')
-        ValueError: Transition ID must be numeric
-    """
-    if not isinstance(transition_id, str):
-        raise ValueError("Transition ID must be a string")
-
-    trimmed_id = transition_id.strip()
-    if not trimmed_id:
-        raise ValueError("Transition ID must be non-empty")
-
-    if not re.fullmatch(r"\d+", trimmed_id):
-        raise ValueError("Transition ID must be numeric")
-
-    return trimmed_id
