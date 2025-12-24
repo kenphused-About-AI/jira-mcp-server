@@ -37,9 +37,9 @@ JQL_ALLOWLIST_PATTERN = re.compile(
 
 CONTROL_CHARACTERS = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]")
 
-FORBIDDEN_JQL_CHARS = re.compile(r"[`;|&\\"]")
+FORBIDDEN_JQL_CHARS = re.compile(r'[`;|&\\"]')
 
-FORBIDDEN_COMMENT_CHARS = re.compile(r"[\x00`;|&\\"]")
+FORBIDDEN_COMMENT_CHARS = re.compile(r'[\x00`;|&\\"]')
 
 UNICODE_BIDIControl = re.compile(r"[\u202A-\u202F\u2066-\u2069]")
 
