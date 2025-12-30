@@ -21,7 +21,9 @@ Security considerations:
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import Any, TypeVar
+
+T = TypeVar("T")
 
 
 def sanitize_log_data(data: Any, max_length: int = 200) -> str:
@@ -258,7 +260,44 @@ def sanitize_project_key(project_key: str) -> str:
     return project_key
 
 
-def _validate_required_args(arguments: dict[str, Any], *required_keys: str) -> None:
+def validate_issue_key(issue_key: str) -> str:
+    """
+    Validate Jira issue key format to prevent injection attacks.
+
+    Jira issue keys follow the format: PROJECT-123 (e.g., DSP-9050)
+    with uppercase letters, numbers, and hyphens only. This function validates
+    the format to prevent injection through invalid issue keys.
+
+    Args:
+        issue_key: The issue key to validate (e.g., "DSP-9050")
+
+    Returns:
+        The validated issue key string
+
+    Raises:
+        ValueError: If the issue key doesn't match expected format
+
+    Security:
+        - Enforces format: ^[A-Z][A-Z0-9]+-\\d+$ (must have hyphen with digits after)
+        - Rejects lowercase letters, special characters, and invalid formats
+        - Prevents path traversal attempts through invalid issue keys
+
+    Example:
+        Valid: 'DSP-9050', 'PROJ-123', 'A1B2-456'
+        Invalid: 'dsp-9050' (lowercase), 'DSP/9050' (slash), 'DSP-9-0-50' (mulitple hyphens)
+    """
+    if not issue_key or not isinstance(issue_key, str):
+        raise ValueError("Issue key must be a non-empty string")
+
+    # Issue keys follow format: PROJECT-123 (uppercase, hyphen, digits)
+    # Must have at least one letter, then hyphen, then at least one digit
+    if not re.match(r"^[A-Z][A-Z0-9]+-\d+$", issue_key):
+        raise ValueError(f"Invalid issue key format: {issue_key}")
+
+    return issue_key
+
+
+def validate_required_args(arguments: dict[str, Any], *required_keys: str) -> None:
     """
     Validate that required arguments are present and non-empty.
 
@@ -275,7 +314,7 @@ def _validate_required_args(arguments: dict[str, Any], *required_keys: str) -> N
 
     Usage:
         # At the start of a tool handler:
-        _validate_required_args(arguments, "issueKey", "comment")
+        validate_required_args(arguments, "issueKey", "comment")
         # Raises ValueError if issueKey or comment is missing/empty
     """
     missing = [key for key in required_keys if not arguments.get(key)]

@@ -35,8 +35,9 @@ from .jira_api import execute_curl
 from .sanitization import (
     sanitize_jql,
     sanitize_project_key,
-    _validate_required_args,
     text_to_adf,
+    validate_issue_key,
+    validate_required_args,
 )
 
 logger = logging.getLogger(__name__)
@@ -123,10 +124,12 @@ async def _handle_get_jira_issue(arguments: dict[str, Any]) -> Any:
         Full Jira issue object with all fields
 
     Security:
-        - No sanitization needed for issueKey (it's just routed to API)
-        - IssueKey format is validated by Jira API itself
+        - Validates issueKey format to prevent injection
+        - Returns complete issue object
     """
     issue_key = arguments["issueKey"]
+    # Validate issue key format
+    issue_key = validate_issue_key(issue_key)
     return await execute_curl(f"issue/{issue_key}")
 
 
@@ -145,10 +148,12 @@ async def _handle_get_jira_comments(arguments: dict[str, Any]) -> Any:
         Array of comment objects for the issue
 
     Security:
-        - IssueKey is validated by Jira API
+        - Validates issueKey format to prevent injection
         - Comments are returned as-is from Jira
     """
     issue_key = arguments["issueKey"]
+    # Validate issue key format
+    issue_key = validate_issue_key(issue_key)
     return await execute_curl(f"issue/{issue_key}/comment")
 
 
@@ -167,10 +172,12 @@ async def _handle_get_jira_transitions(arguments: dict[str, Any]) -> Any:
         Array of available transition objects
 
     Security:
-        - IssueKey is validated by Jira API
+        - Validates issueKey format to prevent injection
         - Transitions are specific to the issue and user permissions
     """
     issue_key = arguments["issueKey"]
+    # Validate issue key format
+    issue_key = validate_issue_key(issue_key)
     return await execute_curl(f"issue/{issue_key}/transitions")
 
 
@@ -222,7 +229,7 @@ async def _handle_create_jira_issue(arguments: dict[str, Any]) -> Any:
     issue_type = arguments.get("issueType", "Task")
 
     # Validate required fields
-    _validate_required_args(arguments, "projectKey", "summary", "issueType")
+    validate_required_args(arguments, "projectKey", "summary", "issueType")
 
     # Build fields with ADF format for description
     fields: dict[str, Any] = {
@@ -263,8 +270,11 @@ async def _handle_add_jira_comment(arguments: dict[str, Any]) -> Any:
     issue_key = arguments["issueKey"]
     comment = arguments["comment"]
 
+    # Validate issue key format
+    issue_key = validate_issue_key(issue_key)
+
     # Validate required fields
-    _validate_required_args(arguments, "issueKey", "comment")
+    validate_required_args(arguments, "issueKey", "comment")
 
     # Convert comment to ADF format
     comment_body = text_to_adf(comment)
@@ -297,8 +307,11 @@ async def _handle_update_jira_issue(arguments: dict[str, Any]) -> Any:
     """
     issue_key = arguments["issueKey"]
 
+    # Validate issue key format
+    issue_key = validate_issue_key(issue_key)
+
     # Validate required fields
-    _validate_required_args(arguments, "issueKey")
+    validate_required_args(arguments, "issueKey")
 
     update_fields: dict[str, Any] = {}
     if "summary" in arguments:
@@ -340,8 +353,11 @@ async def _handle_transition_jira_issue(arguments: dict[str, Any]) -> Any:
     issue_key = arguments["issueKey"]
     transition_id = arguments["transitionId"]
 
+    # Validate issue key format
+    issue_key = validate_issue_key(issue_key)
+
     # Validate required fields
-    _validate_required_args(arguments, "issueKey", "transitionId")
+    validate_required_args(arguments, "issueKey", "transitionId")
 
     data = json.dumps({"transition": {"id": transition_id}})
     logger.info(f"Transitioning issue {issue_key} with transition {transition_id}")
