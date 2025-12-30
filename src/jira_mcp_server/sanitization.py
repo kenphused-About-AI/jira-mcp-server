@@ -1,4 +1,22 @@
-"""Input validation and sanitization for Jira MCP Server."""
+"""
+Input validation and sanitization for Jira MCP Server.
+
+This module provides functions to sanitize and validate user inputs to prevent security
+vulnerabilities such as injection attacks, path traversal, and command injection.
+
+All sanitization functions follow these principles:
+1. Validate input format against expected patterns
+2. Reject dangerous characters that could be used for injection
+3. Provide clear error messages for debugging
+4. Never log sensitive data
+5. Raise ValueError for invalid inputs
+
+Security considerations:
+- JQL queries are validated to prevent command injection
+- Project keys are validated to prevent injection and ensure proper format
+- Endpoints are sanitized to prevent path traversal
+- Log data is redacted to prevent credential leakage
+"""
 
 from __future__ import annotations
 
@@ -10,12 +28,26 @@ def sanitize_log_data(data: Any, max_length: int = 200) -> str:
     """
     Sanitize data for logging by removing sensitive fields and truncating.
 
+    This function recursively traverses data structures to redact sensitive information
+    such as passwords, tokens, and API keys before logging. It's used throughout the
+    application to prevent accidental logging of credentials.
+
     Args:
         data: Data to sanitize (dict, str, or other)
-        max_length: Maximum length for string output
+        max_length: Maximum length for string output (truncates long data)
 
     Returns:
-        Sanitized string representation
+        Sanitized string representation safe for logging
+
+    Security:
+        - Redacts fields containing 'password', 'token', 'secret', etc.
+        - Case-insensitive matching for sensitive field names
+        - Handles nested dicts and lists recursively
+        - Truncates long output to prevent log spam
+
+    Example:
+        input: {'user': 'admin', 'apiToken': 'secret123', 'password': 'pass'}
+        output: '{\'user\': \'admin\', \'apiToken\': \'**REDACTED**\', \'password\': \'**REDACTED**\'}'
     """
     # Sensitive field names to redact
     sensitive_fields = {
@@ -62,7 +94,33 @@ def sanitize_log_data(data: Any, max_length: int = 200) -> str:
 
 
 def text_to_adf(text: str) -> dict[str, Any]:
-    """Convert plain text to Atlassian Document Format (ADF)."""
+    """
+    Convert plain text to Atlassian Document Format (ADF).
+
+    Atlassian Document Format is the rich text format used by Jira for descriptions
+    and comments. This function converts simple plain text with paragraph breaks
+    into the minimal ADF structure required by the Jira API.
+
+    Args:
+        text: Plain text string to convert
+
+    Returns:
+        ADF document structure as a dictionary
+        Example: {
+            "version": 1,
+            "type": "doc",
+            "content": [
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "paragraph text"}]
+                }
+            ]
+        }
+
+    Note:
+        Split text by double newlines to handle paragraphs correctly.
+        Empty paragraphs are filtered out.
+    """
     if not text:
         return {"version": 1, "type": "doc", "content": []}
 
@@ -83,7 +141,27 @@ def text_to_adf(text: str) -> dict[str, Any]:
 
 
 def sanitize_endpoint(endpoint: str) -> str:
-    """Sanitize endpoint to prevent path traversal and injection attacks."""
+    """
+    Sanitize endpoint to prevent path traversal and injection attacks.
+
+    Jira API endpoints can be manipulated through user input. This function validates
+    that endpoints only contain safe characters and prevents directory traversal
+    attempts.
+
+    Args:
+        endpoint: API endpoint path (e.g., "issue/KEY-123")
+
+    Returns:
+        Sanitized endpoint string
+
+    Raises:
+        ValueError: If endpoint contains dangerous characters or patterns
+
+    Security:
+        - Only allows alphanumeric, hyphens, underscores, and forward slashes
+        - Rejects relative path patterns like ".."
+        - Rejects absolute paths starting with "/"
+    """
     # Allow only alphanumeric, hyphens, slashes, and underscores
     if not re.match(r"^[a-zA-Z0-9/_-]+$", endpoint):
         raise ValueError(f"Invalid endpoint format: {endpoint}")
@@ -96,16 +174,31 @@ def sanitize_endpoint(endpoint: str) -> str:
 
 
 def sanitize_jql(jql: str) -> str:
-    """Sanitize JQL query to prevent injection attacks.
+    """
+    Sanitize JQL query to prevent injection attacks.
+
+    JQL (Jira Query Language) is powerful but can be abused through injection attacks
+    if improperly sanitized. This function checks for dangerous characters and patterns
+    that could be used to execute arbitrary commands or access unauthorized data.
 
     Args:
         jql: The JQL query string to sanitize
 
     Returns:
-        The sanitized JQL query
+        The validated JQL query string
 
     Raises:
-        ValueError: If the JQL contains dangerous characters
+        ValueError: If the JQL contains dangerous characters or patterns
+
+    Security:
+        - Rejects shell metacharacters: ; | & $ ` \n \r \x00
+        - Detects SQL comment patterns that could hide malicious queries
+        - Validates input is a non-empty string
+        - Provides specific error messages for different injection vectors
+
+    Example:
+        Valid: 'project = DSP AND status = Open'
+        Invalid: 'project = DSP; rm -rf /tmp' (contains shell metacharacter)
     """
     if not jql or not isinstance(jql, str):
         raise ValueError("JQL query must be a non-empty string")
@@ -130,16 +223,29 @@ def sanitize_jql(jql: str) -> str:
 
 
 def sanitize_project_key(project_key: str) -> str:
-    """Sanitize project key to prevent injection attacks.
+    """
+    Sanitize project key to prevent injection attacks.
+
+    Jira project keys follow a specific format (typically uppercase letters and numbers)
+    and should not contain special characters that could be used for injection.
 
     Args:
-        project_key: The project key to sanitize
+        project_key: The project key to sanitize (e.g., "DSP", "PROJ")
 
     Returns:
-        The sanitized project key
+        The validated project key string
 
     Raises:
-        ValueError: If the project key format is invalid
+        ValueError: If the project key contains invalid characters or format
+
+    Security:
+        - Only allows uppercase letters, numbers, and underscores
+        - Enforces typical length constraints (2-10 characters)
+        - Rejects lowercase letters and special characters
+
+    Example:
+        Valid: 'DSP', 'PROJ', 'A123'
+        Invalid: 'dsp' (lowercase), 'PROJ!' (special char), 'a' (too short)
     """
     if not project_key or not isinstance(project_key, str):
         raise ValueError("Project key must be a non-empty string")
@@ -153,7 +259,25 @@ def sanitize_project_key(project_key: str) -> str:
 
 
 def _validate_required_args(arguments: dict[str, Any], *required_keys: str) -> None:
-    """Validate that required arguments are present and non-empty."""
+    """
+    Validate that required arguments are present and non-empty.
+
+    This helper function checks tool arguments before processing to ensure all required
+    fields are provided. It's used at the start of all tool handlers to fail fast
+    with clear error messages.
+
+    Args:
+        arguments: Dictionary of tool arguments
+        required_keys: Variable list of required argument names
+
+    Raises:
+        ValueError: If any required argument is missing or empty
+
+    Usage:
+        # At the start of a tool handler:
+        _validate_required_args(arguments, "issueKey", "comment")
+        # Raises ValueError if issueKey or comment is missing/empty
+    """
     missing = [key for key in required_keys if not arguments.get(key)]
     if missing:
         raise ValueError(f"Missing required arguments: {', '.join(missing)}")

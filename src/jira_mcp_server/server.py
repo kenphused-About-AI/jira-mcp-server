@@ -1,4 +1,34 @@
-"""MCP server implementation for Jira integration."""
+"""
+MCP server implementation for Jira integration.
+
+This module implements the Model Context Protocol (MCP) server that exposes
+Jira functionality to MCP clients. It handles tool registration, request
+routing, and response formatting.
+
+Key components:
+- FastMCP server instance
+- Tool definitions with schemas
+- Tool routing and execution
+- Error handling and response formatting
+- Server lifecycle management
+
+The server implements 8 MCP tools that provide complete Jira integration:
+1. search_jira - Search using JQL
+2. list_jira_issues - List project issues
+3. get_jira_issue - Get issue details
+4. get_jira_comments - Get comments
+5. get_jira_transitions - Get available transitions
+6. get_jira_projects - List projects
+7. create_jira_issue - Create new issue
+8. add_jira_comment - Add comment
+9. update_jira_issue - Update issue
+10. transition_jira_issue - Change status
+
+Security considerations:
+- All tool arguments are validated before processing
+- Responses are properly formatted and don't expose sensitive data
+- Errors are caught and returned as user-friendly messages
+"""
 
 from __future__ import annotations
 
@@ -144,6 +174,18 @@ TOOL_DEFINITIONS = [
         },
     },
 ]
+
+"""
+Tool definitions for the MCP protocol.
+
+Each tool definition includes:
+- name: Unique identifier for the tool
+- description: Human-readable description
+- properties: Parameter definitions with schemas
+
+These definitions are used by MCP clients to understand available
+functionality and parameter requirements.
+"""
 
 
 def _format_response(data: Any) -> str:
