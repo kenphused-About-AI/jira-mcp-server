@@ -325,7 +325,3 @@ async def main() -> None:
     finally:
         safe_log(logging.INFO, "Jira MCP server stopped")
         await close_http_session()
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
