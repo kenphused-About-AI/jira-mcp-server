@@ -18,6 +18,39 @@
 ### Pre-commit
 - Lint and type check: `uv run ruff check . && uv run mypy jira_mcp`
 
+## Installation and Usage
+
+### Package Installation
+- Install in development mode: `pip install -e .`
+- Install globally: `pip install .`
+
+### Running the Server
+- Run via package entry point: `jira-mcp-server`
+- Run directly: `uv run python src/jira_mcp_server/__main__.py`
+
+### Environment Variables
+Provide `.env.example` with defaults including:
+- `JIRA_BASE_URL`: URL to your Jira instance
+- `JIRA_API_TOKEN`: API token for authentication
+- `JIRA_USERNAME`: Username for basic auth
+- `JIRA_PROJECT_KEY`: Default project key
+
+Example `.env.example` content:
+```
+JIRA_BASE_URL=https://your-domain.atlassian.net
+JIRA_API_TOKEN=your-api-token-here
+JIRA_USERNAME=email@example.com
+JIRA_PROJECT_KEY=PROJ
+```
+
+### FastMCP Usage
+The server implements 8 MCP tools:
+- `search_jira`: Search issues using JQL
+- `create_jira_issue`: Validates project keys and converts text to ADF safely
+- `update_jira_issue`: Sanitizes field updates and validates required parameters
+- `transition_jira_issue`: Validates transition IDs before sending to API
+- All other tools validate keys and identifiers before making API calls
+
 ## Code Style Guidelines
 
 ### Import Order
@@ -78,11 +111,58 @@ def sanitize_jql(jql: str) -> str:
 ```
 
 ### Security
-- Never log or store credentials
-- Validate all external inputs
-- Prepend `sanitize_` to validation functions
-- Use HTTPS for all external calls
-- Fail securely (prevent path traversal, script injection)
+### MCP Tool Security
+- Input validation: All MCP tool arguments must be validated and sanitized before use
+- Never trust client-provided data
+- Document security implications for each tool
+- Handle error conditions gracefully without leaking stack traces or sensitive data
+- Log tool invocations with sanitized arguments only
+
+FastMCP implements 8 tools with strict input validation:
+- `search_jira`: Validates JQL syntax and prevents injection via `sanitize_jql()`
+- `create_jira_issue`: Validates project keys and converts text to ADF safely
+- `update_jira_issue`: Sanitizes field updates and validates required parameters
+- `transition_jira_issue`: Validates transition IDs before sending to API
+- All other tools validate keys and identifiers before making API calls
+
+Example security check pattern:
+```python
+# Always validate arguments at the start of tool handlers
+def _validate_required_args(arguments: dict[Any], *required_fields: str) -> None:
+    """Validate that all required fields are present in arguments."""
+    missing = [field for field in required_fields if field not in arguments]
+    if missing:
+        raise ValueError(f"Missing required fields: {', '.join(missing)}")
+
+async def _handle_create_jira_issue(arguments: dict[str, Any]) -> Any:
+    """Handle create_jira_issue with full validation."""
+    # Validate required fields first
+    _validate_required_args(arguments, "projectKey", "summary", "issueType")
+    
+    # Sanitize inputs
+    project_key = sanitize_project_key(arguments["projectKey"])
+    summary = sanitize_text(arguments["summary"])
+    
+    # ... rest of implementation
+```
+
+Example:
+```python
+async def _handle_search_jira(arguments: dict[str, Any]) -> Any:
+    """Handle search_jira tool with input sanitization."""
+    # Sanitize inputs before processing
+    jql = sanitize_jql(arguments["jql"])
+    max_results = max(1, min(100, arguments.get("maxResults", 50)))
+    
+    # Execute Jira search
+    return await execute_curl(
+        "search/jql",
+        query_params={
+            "jql": jql,
+            "maxResults": max_results,
+        },
+    )
+```
 
 ### Logging
 - Configure logging in `app.py` with INFO level (stdout)
@@ -140,13 +220,43 @@ jira_mcp/
 - Validate environment variables at startup
 
 ### Tool Implementation
-1. Define async handler in `tools.py`
-2. Add to `TOOLS` dictionary
-3. Add schema to `TOOL_SCHEMAS` list
+1. Define async handler in `tools.py` (prefix with `_handle_`)
+2. Add to `TOOL_HANDLERS` dictionary with handler name as key
+3. Ensure proper configuration in `__main__.py` entry point
 4. Write tests covering:
    - Valid inputs
    - Invalid inputs (error cases)
    - Edge cases (empty, max length, special chars)
+   
+Example:
+```python
+async def _handle_search_jira(arguments: dict[str, Any]) -> Any:
+    """Handle search_jira tool."""
+    jql = sanitize_jql(arguments["jql"])
+    max_results = arguments.get("maxResults", 50)
+    start_at = arguments.get("startAt", 0)
+    return await execute_curl(
+        "search/jql",
+        query_params={
+            "jql": jql,
+            "maxResults": max_results,
+            "startAt": start_at,
+            "fields": STANDARD_ISSUE_FIELDS,
+        },
+    )
+
+TOOL_HANDLERS: dict[str, Any] = {
+    "search_jira": _handle_search_jira,
+    "list_jira_issues": _handle_list_jira_issues,
+    # ... other tools
+}
+```
+
+All handlers should:
+- Validate all inputs at start via `_validate_required_args()`
+- Sanitize inputs using `sanitize_*` functions
+- Log tool invocations with sanitized arguments
+- Handle errors gracefully without exposing sensitive details
 
 ### Test Organization
 - One test class per feature

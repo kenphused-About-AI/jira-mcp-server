@@ -1,6 +1,6 @@
-# Jira Curl MCP Server (Python)
+# Jira MCP Server (Python)
 
-A Model Context Protocol (MCP) server that provides Jira integration using curl commands. This server allows AI assistants to interact with Jira issues, search, create, update, and manage Jira workflows.
+A Model Context Protocol (MCP) server that provides Jira integration. This server allows AI assistants to interact with Jira issues, search, create, update, and manage Jira workflows.
 
 ## Features
 
@@ -233,14 +233,19 @@ Transition an issue to a new status.
 ```
 jira-mcp-server/
 ├── src/
-│   └── jira_curl_server/
-│       └── __init__.py      # Main server implementation
+│   └── jira_mcp_server/
+│       ├── __init__.py          # Server initialization
+│       ├── __main__.py          # CLI entry point
+│       ├── config.py           # Configuration loading
+│       ├── http_client.py      # Async HTTP client
+│       ├── jira_api.py         # Jira API wrapper
+│       ├── server.py           # FastMCP server
+│       ├── tools.py            # Tool handlers
+│       └── sanitization.py     # Input validation
 ├── tests/
-│   ├── __init__.py
-│   └── test_jira_curl_server.py  # Unit tests
-├── pyproject.toml           # Project configuration
-├── .gitignore              # Git ignore rules
-└── README.md               # This file
+│   └── test_jira_mcp_server.py  # Unit tests
+├── pyproject.toml           # Project config
+└── README.md               # Documentation
 ```
 
 ### Installing in Development Mode
@@ -298,30 +303,59 @@ uv run ruff format src/
 - This server uses Jira REST API v3
 - If you encounter API deprecation warnings, the server may need updates
 
-## Security Notes
+## Security Best Practices
 
-- **Never commit API tokens** to version control
-- Use environment variables for sensitive data
-- Consider using a secrets manager for production deployments
-- Regularly rotate your API tokens
+### Input Validation
+
+All MCP tool arguments are validated and sanitized before use:
+
+- ✅ **JQL Sanitization**: Jira Query Language input is validated to prevent injection attacks via `sanitize_jql()` function
+- ✅ **Project Key Validation**: All project keys are validated using `sanitize_project_key()`
+- ✅ **Issue Key Validation**: Issue identifiers are validated using `sanitize_issue_key()` to ensure proper format
+- ✅ **Endpoint Sanitization**: API endpoints are sanitized to prevent path traversal attacks
+- ✅ **Content Sanitization**: All content passed to APIs is validated
+
+### Credential Management
+
+- **Never commit credentials**: Never commit `.env`, `credentials.json`, or any file containing API tokens to version control
+- **Use environment variables**: Store sensitive data in environment variables, not in code
+- **Rotate tokens regularly**: Regularly rotate your Jira API tokens (recommended: every 30-90 days)
+- **Limit permissions**: Use Jira API tokens with minimal required permissions
+- **Use secrets manager**: For production deployments, use a secrets manager (AWS Secrets Manager, HashiCorp Vault, etc.)
+
+### Runtime Security
+
+- **HTTPS enforcement**: The server enforces HTTPS for all requests (validation in `config.py`)
+- **No credential logging**: Credentials are never logged (URL sanitization removes any embedded credentials)
+- **Timeout protection**: All HTTP requests include a 30-second timeout to prevent hanging
+- **Connection pooling**: HTTPClient with connection pooling for secure and efficient requests
+- **Async operations**: Properly managed async operations to prevent resource exhaustion
+
+### Developer Security
+
+- **Development environment**: Create a `.env` file for local development with a dedicated test token
+- **Pre-commit hooks**: Verify no credentials are committed using hooks
+- **Dependency management**: Use `uv sync` to manage dependencies with proper Pinning
+- **Code review**: All changes reviewed for security implications before merge
+
+### Security Features
+
+The server implements:
+
+- **Comprehensive input validation** across all API endpoints
+- **Automatic credential sanitization** for logging
+- **HTTPS enforcement** for all Jira server communications
+- **Request timeout protection** preventing denial of service
+- **Connection pooling** with secure defaults
+- **Proper error handling** that doesn't leak sensitive information
+
+**For production deployments**, we recommend:
+- Using dedicated Jira service accounts with minimal permissions
+- Implementing network-level security (firewalls, VPNs)
+- Monitoring for unusual API usage patterns
+- Regularly audit access logs
 
 ## Recent Improvements
-
-### Version 0.3.0 (Latest)
-- **🚀 Performance**: Replaced curl subprocess with aiohttp for true async HTTP
-- **🔒 Security**: Added input sanitization to prevent command injection
-- **⚡ Connection Pooling**: Reuses HTTP connections for 3-5x faster requests
-- **⏱️ Timeouts**: Added 30-second request timeout to prevent hanging
-- **🛡️ Credential Protection**: Credentials no longer exposed in process arguments
-- **✅ Enhanced Testing**: Updated test suite for aiohttp implementation
-
-### Version 0.2.0
-- **Fixed Jira API v3 Compatibility**: Description and comment fields now use Atlassian Document Format (ADF)
-- **Enhanced Error Handling**: Proper HTTP status code checking and detailed error messages
-- **Input Validation**: TypedDict-based validation for all tool arguments
-- **Comprehensive Logging**: Structured logging for debugging and monitoring
-- **Unit Tests**: Full test suite with pytest covering all major functionality
-- **Code Quality**: Added mypy type checking and ruff linting configuration
 
 ## Comparison with Node.js Version
 
@@ -349,31 +383,3 @@ For issues or questions:
 - Create an issue in the repository
 - Contact the maintainer
 
-## Changelog
-
-### v0.3.0 (Current)
-- **BREAKING**: Replaced curl subprocess with aiohttp for async HTTP
-- Added HTTP connection pooling (10 concurrent connections, 5 per host)
-- Implemented input sanitization to prevent command injection attacks
-- Added 30-second request timeout to prevent hanging requests
-- Credentials no longer exposed in process arguments (security fix)
-- Enhanced error messages with better context
-- Updated all tests for aiohttp implementation
-- Improved documentation with security notes
-
-### v0.2.0
-- Fixed Jira API v3 compatibility with ADF format
-- Added comprehensive error handling with HTTP status codes
-- Implemented input validation with TypedDict
-- Added structured logging throughout
-- Created full unit test suite
-- Added code quality tools (mypy, ruff)
-- Improved documentation
-
-### v0.1.0
-- Initial Python port from Node.js/TypeScript
-- Support for Jira REST API v3
-- Basic CRUD operations for issues
-- JQL search support
-- Comment management
-- Workflow transitions
