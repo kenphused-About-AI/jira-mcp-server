@@ -88,6 +88,7 @@ url = f"{JIRA_URL}/rest/api/3/{endpoint}"
 - ✅ All endpoints validated before URL construction
 - ✅ JQL queries sanitized to prevent injection attacks
 - ✅ Project keys validated with strict format requirements
+- ✅ Issue keys validated against standard Jira format
 - ✅ Multiple layers of defense against command injection
 - ✅ Clear error messages for invalid input
 
@@ -213,15 +214,42 @@ except asyncio.TimeoutError:
 - ✅ Prevents DoS via resource exhaustion
 - ✅ Applied to all HTTP requests through session
 
-### 5. No Input Validation for Issue Keys (Line 259, 265, etc.)
+### 5. No Input Validation for Issue Keys (Line 259, 265, etc.) ✅ RESOLVED
 **Severity:** MEDIUM  
 **Location:** Multiple locations
+
+**Status:** ✅ **RESOLVED**
 
 **Issue:**
 ```python
 issue_key = arguments["issueKey"]
 return await execute_curl(f"issue/{issue_key}")  # No validation
 ```
+
+**Risk:**
+- Path traversal attacks  
+- Access to unauthorized resources
+
+**Resolution Implemented:**
+
+1. **Added `validate_issue_key()` function** (src/jira_mcp_server/sanitization.py:23-26):
+   - Validates issue key format using regex `^[A-Z][A-Z0-9]+-\\d+$`
+   - Requires uppercase letter prefix, alphanumeric project key, and numeric suffix
+   - Prevents path traversal and injection attacks
+
+2. **Applied to all tools using issue keys** (src/jira_mcp_server/tools.py):
+   - Line 132: `get_jira_issue`
+   - Line 156: `get_jira_comments`  
+   - Line 180: `get_jira_transitions`
+   - Line 274: `add_jira_comment`
+   - Line 311: `update_jira_issue`
+   - Line 357: `transition_jira_issue`
+
+**Security Improvements:**
+- ✅ All issue keys validated against standard Jira format
+- ✅ Prevents path traversal attacks via malformed keys
+- ✅ Consists input validation layer for all tools
+- ✅ Clear error messages for debugging
 
 **Risk:**
 - Path traversal attacks
@@ -481,7 +509,7 @@ class JiraAPIError(Exception):
 
 ### Priority 1 (Fix Immediately) - ✅ ALL RESOLVED
 1. ✅ **Remove credentials from process arguments** - Migrated to aiohttp with secure headers
-2. ✅ **Add input sanitization** - Validate all user inputs (endpoint, JQL, project keys)
+2. ✅ **Add input sanitization** - Validate all user inputs (endpoint, JQL, project keys, issue keys)
 3. ✅ **Add request timeouts** - 30-second total, 10-second connect timeouts implemented
 4. ✅ **Use async subprocess** - Replaced subprocess with native aiohttp async HTTP client
 
