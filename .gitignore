@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Virtual environments
+.venv/
+env/
+venv/
+
+# uv
+.uv/
+
+# IDEs
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Logs
+*.log
+
+# Secrets / certs
+.env
+*.pem
+*.key
+*.crt
+
+# Test / coverage
+.coverage
+pytest_cache/
+coverage.xml
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+EOF
