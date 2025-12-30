@@ -46,6 +46,17 @@ from .tools import TOOL_HANDLERS
 
 logger = logging.getLogger(__name__)
 
+
+# Create a safe logging function that handles broken pipe errors
+def safe_log(level: int, msg: str, *args: Any, **kwargs: Any) -> None:
+    """Logging function that doesn't fail if the pipe is broken."""
+    try:
+        logger.log(level, msg, *args, **kwargs)
+    except (BrokenPipeError, IOError):
+        # Ignore broken pipe errors - common when client disconnects
+        pass
+
+
 # Create server instance
 app = FastMCP("jira-mcp-server")
 
@@ -304,15 +315,15 @@ async def main() -> None:
     """Main entry point for the MCP server."""
     from .config import JIRA_URL
 
-    logger.info(f"Starting Jira MCP server for {JIRA_URL}")
+    safe_log(logging.INFO, f"Starting Jira MCP server for {JIRA_URL}")
 
     try:
         await app.run_stdio_async()
-        logger.info("Jira MCP server started")
+        safe_log(logging.INFO, "Jira MCP server started")
     except (KeyboardInterrupt, asyncio.CancelledError):
         pass
     finally:
-        logger.info("Jira MCP server stopped")
+        safe_log(logging.INFO, "Jira MCP server stopped")
         await close_http_session()
 
 
